@@ -19,11 +19,16 @@ import sys
 
 class VGGModel(tf.keras.Model):
     
-    def __init__(self, num_channels=3, train_enc=False, load_weight=1):
+    def __init__(self, num_channels=3, train_enc=False, load_weight=1,loss_function=tf.keras.losses.KLDivergence(),optimizer = tf.keras.optimizers.Adam()):
         super(VGGModel, self).__init__()
         
         self.num_channels = num_channels
-        
+        self.loss_function = loss_function
+        self.optimizer = optimizer
+        self.metrics_list = [tf.keras.metrics.Mean(name="loss"),
+                            tf.keras.metrics.KLDivergence(name="kl_divergence"),
+                            tf.keras.metrics.MeanSquaredError(name = 'MSE')]
+     
         
         
         if load_weight:
@@ -35,12 +40,19 @@ class VGGModel(tf.keras.Model):
         for layer in self.vgg.layers:
             layer.trainable = train_enc
             
-        self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:5])
-        self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[5:9])
-        self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[9:14])
-        self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[14:18])
-        self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[18:])
-        
+        # self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:5])
+        # self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[5:9])
+        # self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[9:14])
+        # self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[14:18])
+        # self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[18:])
+
+        self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:4])
+        self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[4:7])
+        self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[7:11])
+        self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[11:15])
+        self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[15:])
+
+
         self.linear_upsampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
         self.deconv_layer1 = tf.keras.Sequential([
             tf.keras.layers.Conv2D(filters = 512, kernel_size = 3, padding = 'same', use_bias = True),
@@ -68,6 +80,7 @@ class VGGModel(tf.keras.Model):
             tf.keras.layers.Conv2D(filters = 1, kernel_size = 3, padding = 'same', use_bias = True),
             tf.keras.layers.Activation('sigmoid')
         ])
+
     def call(self, images):
         batch_size = images.shape[0]
         
@@ -89,58 +102,121 @@ class VGGModel(tf.keras.Model):
         
         ###ab hier alle assertions angepasst, weil bei dem model andere shapes rauskommen###
 
-        #assert out5.shape == (batch_size, 16, 16, 512)
-        assert out5.shape == (batch_size, 14, 14, 512)
+       
+        #assert out5.shape == (batch_size, 14, 14, 512)
+       
         
         #print(out4.shape)
         #shape=(1, 128)
         x = tf.concat((out5, out4), axis=3)
-        #assert x.shape == (batch_size, 16, 16, 1024)
-        assert x.shape == (batch_size, 14, 14, 1024)
+       
+        #assert x.shape == (batch_size, 14, 14, 1024)
+        
+
         
         x = self.deconv_layer1(x)
         
-        #assert x.shape == (batch_size, 32, 32, 512)
-        assert x.shape == (batch_size, 28, 28, 512)
+      
+       #assert x.shape == (batch_size, 28, 28, 512)
+        
         #out3 = self.linear_upsampling(out3) #added to get same shape
 
         x = tf.concat([x, out3], axis=3)
-        #assert x.shape == (batch_size, 32, 32, 1024)
-        assert x.shape == (batch_size, 28, 28, 1024)
-        x = self.deconv_layer2(x)
+       
         
-        #assert x.shape == (batch_size, 64, 64, 256)
-        assert x.shape == (batch_size, 56, 56, 256)
+        #assert x.shape == (batch_size, 28, 28, 1024)
+        
+        
+        x = self.deconv_layer2(x)
+      
+        #assert x.shape == (batch_size, 56, 56, 256)
+        
      
         x = tf.concat([x, out2], axis=3)
        
-        #assert x.shape == (batch_size, 64, 64, 512)
-        assert x.shape == (batch_size, 56, 56, 512)
+       
+        #assert x.shape == (batch_size, 56, 56, 512)
+        
         x = self.deconv_layer3(x)
-        #assert x.shape == (batch_size, 128, 128, 128)
-        assert x.shape == (batch_size, 112, 112, 128)
+        
+        #assert x.shape == (batch_size, 112, 112, 128)
+      
         
         x = tf.concat([x, out1], axis=3)
-        #assert x.shape == (batch_size, 128, 128, 256)
-        assert x.shape == (batch_size, 112, 112, 256)
+        #assert x.shape == (batch_size, 112, 112, 256)
+       
         x = self.deconv_layer4(x)
+       
+      
+        
         x = self.deconv_layer5(x)
         #assert x.shape == (batch_size, 256, 256, 1)
         assert x.shape == (batch_size, 224, 224, 1)
+      
        
         x = tf.squeeze(x,axis = 3)
         #assert x.shape == (batch_size, 256, 256)
         assert x.shape == (batch_size, 224, 224)
+     
         return x
+    
+    @property
+    def metrics(self):
+        return self.metrics_list
+
+    def reset_metrics(self):
+        for metric in self.metrics:
+            metric.reset_states()
+
+
+    def train_step(self,img,gt):
+        with tf.GradientTape() as tape: 
+            pred_map = self(img,training = True)
+      
+            assert pred_map.shape == gt.shape
+            
+            loss = tf.constant(0.0, dtype = tf.float32)
+            loss += self.loss_function(pred_map,gt)
+            #loss = self.loss_function(pred_map, gt)
+            
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+        self.metrics[0].update_state(loss)
+        self.metrics[1].update_state(gt, pred_map)
+        self.metrics[2].update_state(gt, pred_map)
+
+        return {m.name : m.result() for m in self.metrics}
+    
+    def test_step(self,img,gt):
+        
+        
+        pred_map = self(img,training = False)
+    
+        assert pred_map.shape == gt.shape
+        
+        loss = self.loss_function(pred_map, gt)
+        
+       
+        self.metrics[0].update_state(loss)
+        self.metrics[1].update_state(gt, pred_map)
+        self.metrics[2].update_state(gt, pred_map)
+
+        return {m.name : m.result() for m in self.metrics}
 
 
 class MultimodalModel(tf.keras.Model):
     
-    def __init__(self, num_channels=3, train_enc=False, load_weight=1):
+    def __init__(self, num_channels=3, train_enc=False, load_weight=1,loss_function=tf.keras.losses.KLDivergence(),optimizer = tf.keras.optimizers.Adam()):
         super(MultimodalModel, self).__init__()
         
         self.num_channels = num_channels
-        
+        self.loss_function = loss_function
+        self.optimizer = optimizer
+        self.metrics_list = [tf.keras.metrics.Mean(name="loss"),
+                            tf.keras.metrics.KLDivergence(name="kl_divergence"),
+                            tf.keras.metrics.MeanSquaredError(name = 'MSE')]
+     
         
         
         if load_weight:
@@ -152,11 +228,17 @@ class MultimodalModel(tf.keras.Model):
         for layer in self.vgg.layers:
             layer.trainable = train_enc
             
-        self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:5])
-        self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[5:9])
-        self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[9:14])
-        self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[14:18])
-        self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[18:])
+        # self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:5])
+        # self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[5:9])
+        # self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[9:14])
+        # self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[14:18])
+        # self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[18:])
+
+        self.conv_layer1 = tf.keras.Sequential(self.vgg.layers[:4])
+        self.conv_layer2 = tf.keras.Sequential(self.vgg.layers[4:7])
+        self.conv_layer3 = tf.keras.Sequential(self.vgg.layers[7:11])
+        self.conv_layer4 = tf.keras.Sequential(self.vgg.layers[11:15])
+        self.conv_layer5 = tf.keras.Sequential(self.vgg.layers[15:])
         
         self.linear_upsampling = tf.keras.layers.UpSampling2D(size=(2, 2), interpolation='bilinear')
         self.deconv_layer1 = tf.keras.Sequential([
@@ -205,6 +287,7 @@ class MultimodalModel(tf.keras.Model):
         out5 = self.conv_layer5(out4)
         #print(out5.shape)
         out5 = self.linear_upsampling(out5)
+        
         # out4 = self.linear_upsampling(out4) #zusätzlich hinzugefügt weil sonst outputs nicht übereinstimmen (in pytorch schon, in tensorflow kommt anderer output raus)
 
         
@@ -214,7 +297,7 @@ class MultimodalModel(tf.keras.Model):
         assert out5.shape == (batch_size, 14, 14, 512)
         
         #print(out4.shape)
-        #shape=(1, 786)
+        #shape=(1, 768)
         if dense:
             text_embedding = self.dense_layer(text_embedding)
             text_embedding = self.reshape_layer(text_embedding)
@@ -267,6 +350,51 @@ class MultimodalModel(tf.keras.Model):
         #assert x.shape == (batch_size, 256, 256)
         assert x.shape == (batch_size, 224, 224)
         return x
+    
+    @property
+    def metrics(self):
+        return self.metrics_list
+
+    def reset_metrics(self):
+        for metric in self.metrics:
+            metric.reset_states()
+
+
+    def train_step(self,img,cap,gt):
+        with tf.GradientTape() as tape: 
+            pred_map = self(img,cap,training = True)
+      
+            assert pred_map.shape == gt.shape
+            
+            loss = tf.constant(0.0, dtype = tf.float32)
+            loss += self.loss_function(pred_map,gt)
+            #loss = self.loss_function(pred_map, gt)
+            
+        gradients = tape.gradient(loss, self.trainable_variables)
+        self.optimizer.apply_gradients(zip(gradients, self.trainable_variables))
+
+        self.metrics[0].update_state(loss)
+        self.metrics[1].update_state(gt, pred_map)
+        self.metrics[2].update_state(gt, pred_map)
+
+        return {m.name : m.result() for m in self.metrics}
+    
+    def test_step(self,img,cap,gt):
+        
+        
+        pred_map = self(img,cap,training = False)
+    
+        assert pred_map.shape == gt.shape
+        
+        loss = self.loss_function(pred_map, gt)
+        
+       
+        self.metrics[0].update_state(loss)
+        self.metrics[1].update_state(gt, pred_map)
+        self.metrics[2].update_state(gt, pred_map)
+
+        return {m.name : m.result() for m in self.metrics}
+
 
 
 

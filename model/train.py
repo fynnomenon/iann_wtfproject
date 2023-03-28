@@ -35,7 +35,7 @@ from PIL import Image
 #all arguments that can be choosen/where we can choose between different options (can delete some losses)
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--no_epochs',default=40, type=int)
+parser.add_argument('--no_epochs',default=5, type=int)
 
 parser.add_argument('--lr',default=1e-4, type=float)
 parser.add_argument('--kldiv',default=True, type=bool)
@@ -59,7 +59,7 @@ parser.add_argument('--nss_coeff',default=1.0, type=float)
 parser.add_argument('--nss_emlnet_coeff',default=1.0, type=float)
 parser.add_argument('--nss_norm_coeff',default=1.0, type=float)
 parser.add_argument('--l1_coeff',default=1.0, type=float)
-parser.add_argument('--train_enc',default=1, type=int)
+parser.add_argument('--train_enc',default=0, type=int)
 
 parser.add_argument('--dataset_dir',default="/home/samyak/old_saliency/saliency/SALICON_NEW/", type=str)
 parser.add_argument('--batch_size',default=32, type=int)
@@ -67,6 +67,7 @@ parser.add_argument('--log_interval',default=60, type=int)
 parser.add_argument('--no_workers',default=4, type=int)
 
 parser.add_argument('--model_val_path',default="model.pt", type=str)
+parser.add_argument('--data',default='salicon', type=str)
 
 #run parser and place extracted data in args
 # 
@@ -97,15 +98,26 @@ def preprocessing_multi(data,args):
     data = data.batch(args.batch_size).shuffle(True).prefetch(buffer_size=tf.data.AUTOTUNE)
     return data
 
-train_loader = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
-test_loader = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
+if args.data == 'cap_gaze':
+    print("Data: capgaze1")
+    ds = tf.data.Dataset.load('../tfds_capgaze1', compression='GZIP')
+    train_loader = ds.skip(200)
+    test_loader = ds.take(200)
+    
+    
+else:
+    print("Data: salicon")
+    train_loader = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
+    test_loader = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
 
+# train_loader = train_loader.take(100)
+# test_loader = test_loader.take(100)
 
     
 if args.enc_model == "vgg":
     print("VGG Model")
     from model import VGGModel
-    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight)
+    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=kldiv)
     train_loader = preprocessing(train_loader,args)
     test_loader = preprocessing(test_loader,args)
 
@@ -115,7 +127,7 @@ if args.enc_model == "vgg":
 elif args.enc_model == "multimodal":
     print("Multimodal Model")
     from model import MultimodalModel
-    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight)
+    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=kldiv)
     train_loader = preprocessing_multi(train_loader,args)
     test_loader = preprocessing_multi(test_loader,args)
     multi = True
@@ -132,15 +144,30 @@ else:
 
 def loss_func(pred_map, gt, args):
     loss = tf.constant(0.0, dtype = tf.float32)
-    criterion = tf.keras.losses.MeanAbsoluteError()
+    #criterion = tf.keras.losses.MeanAbsoluteError()
     if args.kldiv:
         loss += args.kldiv_coeff * kldiv(pred_map, gt)
-    if args.cc:
-        loss += args.cc_coeff * cc(pred_map, gt)
+    # if args.cc:
+    #     loss += args.cc_coeff * cc(pred_map, gt)
     return loss
+
+def create_summary_writers(config_name):
+    '''
+    create the summary writer to have access to the metrics of the model 
+    '''
+    current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
+
+    train_log_path = f"logs/tests/{config_name}/{current_time}/train"
+    val_log_path = f"logs/tests/{config_name}/{current_time}/val"
+
+    # log writer
+    train_summary_writer = tf.summary.create_file_writer(train_log_path)
+    val_summary_writer = tf.summary.create_file_writer(val_log_path)
+
+    return train_summary_writer, val_summary_writer
    
 
-def train(model, optimizer, loader, epoch, args):
+def train(model, optimizer, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_writer):
     #loader - loads batches of the data/provides batches of input data 
     #model.train()
     tic = time.time()
@@ -148,8 +175,11 @@ def train(model, optimizer, loader, epoch, args):
     total_loss = 0.0
     cur_loss = 0.0
     #idx = 0
+    
+    
 
-    for idx,(img, cap_gt) in enumerate(tqdm.tqdm(loader, position = 0, leave = True)):
+    for (img, cap_gt) in tqdm.tqdm(train_ds, position = 0, leave = True):
+    
     #for idx, (img, gt, fixations) in enumerate(loader):
         
         img = tf.convert_to_tensor(img, dtype=tf.float32)
@@ -158,36 +188,60 @@ def train(model, optimizer, loader, epoch, args):
             gt = cap_gt[1]
             cap = tf.convert_to_tensor(cap, dtype=tf.float32)
             gt = tf.convert_to_tensor(gt, dtype=tf.float32)
+            metrics = model.train_step(img,cap,gt)
+
         else: 
             gt = tf.convert_to_tensor(cap_gt, dtype=tf.float32)
+            metrics = model.train_step(img,gt)
         #fixations = tf.convert_to_tensor(fixations, dtype=tf.float32)
-        
-        with tf.GradientTape() as tape: 
-            if multi:
-                pred_map = model(img,cap,training = True)
-            else:
-                pred_map = model(img, training = True)
-            assert pred_map.shape == gt.shape
-            
-            loss = loss_func(pred_map, gt, args)
-            
-        gradients = tape.gradient(loss, model.trainable_variables)
-        optimizer.apply_gradients(zip(gradients, model.trainable_variables))
-        
-        total_loss += loss.numpy()
-        cur_loss += loss.numpy()
-   
+        with train_summary_writer.as_default(): 
+                for metric in model.metrics: 
+                    tf.summary.scalar(f"{metric.name}", metric.result(), step=epoch)
 
+        # print the metrics and add to history element
+    for key, value in metrics.items():
+        print(f"train_{key}: {value.numpy()}")
 
-        if idx%args.log_interval==(args.log_interval-1):
-            print('[{:2d}, {:5d}] avg_loss : {:.5f}, time:{:3f} minutes'.format(epoch, idx, cur_loss/args.log_interval, (time.time()-tic)/60))
-            cur_loss = 0.0
-            sys.stdout.flush()
+    #reset metric 
+    model.reset_metrics()
+
+#evaluation on validation set
+    for (img,cap_gt) in tqdm.tqdm(val_ds, position = 0, leave = True):
+        img = tf.convert_to_tensor(img, dtype=tf.float32)
+        if multi:
+            cap = cap_gt[0]
+            gt = cap_gt[1]
+            cap = tf.convert_to_tensor(cap, dtype=tf.float32)
+            gt = tf.convert_to_tensor(gt, dtype=tf.float32)
+            metrics = model.test_step(img, cap,gt)
+        else: 
+            gt = tf.convert_to_tensor(cap_gt, dtype=tf.float32)
+            metrics = model.test_step(img,gt)
+
+        with val_summary_writer.as_default():
+            for metric in model.metrics:
+                tf.summary.scalar(f"{metric.name}", metric.result(), step=epoch)
+
+    # print the metrics and add to history element
+    for key, value in metrics.items():
+        print(f"test_{key}: {value.numpy()}")
+
+    #reset metric
+    model.reset_metrics()
+    print("\n")
     
-    print('[{:2d}, train] avg_loss : {:.5f}'.format(epoch, total_loss/len(loader)))
+    
+
+
+
+        # if idx%args.log_interval==(args.log_interval-1):
+        #     print('[{:2d}, {:5d}] avg_loss : {:.5f}, time:{:3f} minutes'.format(epoch, idx, cur_loss/args.log_interval, (time.time()-tic)/60))
+        #     cur_loss = 0.0
+        #     sys.stdout.flush()
+    
+    #print('[{:2d}, train] avg_loss : {:.5f}'.format(epoch, total_loss/len(loader)))
     sys.stdout.flush()
 
-    return total_loss/len(loader)
 
 def validate(model, loader, epoch, args):
     #model.eval()
@@ -240,33 +294,28 @@ if args.lr_sched:
     optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler)
 
 for epoch in range(0, args.no_epochs):
-    loss = train(model, optimizer, train_loader, epoch, args)
+    train_summary_writer, val_summary_writer = create_summary_writers(config_name = f'RUN')
     
-    # with tf.GradientTape() as tape:
-    #     cc_loss = validate(model, train_loader, epoch, args)
-    #     if epoch == 0 :
-    #         best_loss = cc_loss
-    #     if best_loss <= cc_loss:
-    #         best_loss = cc_loss
-    #         print('[{:2d},  save, {}]'.format(epoch, args.model_val_path))
-    #         model.save_weights(args.model_val_path)
+    train(model, optimizer, train_loader,test_loader, epoch, args,train_summary_writer,val_summary_writer)
+    
+ 
 
-    cc_loss = validate(model, test_loader, epoch, args)
-    if epoch == 0:
-        best_loss = cc_loss.numpy()
-    if best_loss < cc_loss.numpy():
-        best_loss = cc_loss.numpy()
-        print('[{:2d},  save, {}]'.format(epoch, args.model_val_path))
-        # if len(tf.distribute.get_strategy().extended.worker_devices) > 1:
-        #     model.save_weights(args.model_val_path)
-        # else:
-        #     model.save_weights(args.model_val_path)
-        model.save_weights(args.model_val_path)
-    else:
-        print("no change in loss")
-    print("best loss: ", best_loss)
-    print()
+    # cc_loss = validate(model, test_loader, epoch, args)
+    # if epoch == 0:
+    #     best_loss = cc_loss.numpy()
+    # if best_loss < cc_loss.numpy():
+    #     best_loss = cc_loss.numpy()
+    #     print('[{:2d},  save, {}]'.format(epoch, args.model_val_path))
+    #     # if len(tf.distribute.get_strategy().extended.worker_devices) > 1:
+    #     #     model.save_weights(args.model_val_path)
+    #     # else:
+    #     #     model.save_weights(args.model_val_path)
+    #     model.save_weights(args.model_val_path)
+    # else:
+    #     print("no change in loss")
+    # print("best loss: ", best_loss)
+    # print()
 
-    if args.lr_sched:
-        scheduler.step()
+    # if args.lr_sched:
+    #     scheduler.step()
 
