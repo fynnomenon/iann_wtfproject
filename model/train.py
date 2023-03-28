@@ -61,13 +61,14 @@ parser.add_argument('--nss_norm_coeff',default=1.0, type=float)
 parser.add_argument('--l1_coeff',default=1.0, type=float)
 parser.add_argument('--train_enc',default=0, type=int)
 
-parser.add_argument('--dataset_dir',default="/home/samyak/old_saliency/saliency/SALICON_NEW/", type=str)
+parser.add_argument('--dataset_dir',default="../tfds_salicon", type=str)
 parser.add_argument('--batch_size',default=32, type=int)
 parser.add_argument('--log_interval',default=60, type=int)
 parser.add_argument('--no_workers',default=4, type=int)
 
 parser.add_argument('--model_val_path',default="model.pt", type=str)
 parser.add_argument('--data',default='salicon', type=str)
+parser.add_argument('--colab',default=True, type=bool)
 
 #run parser and place extracted data in args
 # 
@@ -99,16 +100,33 @@ def preprocessing_multi(data,args):
     return data
 
 if args.data == 'cap_gaze':
+    if args.colab:
+        dataset_path = '/content/drive/MyDrive/project_ann/tfds_capgaze1'
+    else:
+        dataset_path = '../tfds_capgaze1'
+        
+
     print("Data: capgaze1")
+    
+    ds = tf.data.Dataset.load(dataset_path)
     ds = tf.data.Dataset.load('../tfds_capgaze1', compression='GZIP')
     train_loader = ds.skip(200)
     test_loader = ds.take(200)
     
     
 else:
+    if args.colab:
+        dataset_path = '/content/drive/MyDrive/project_ann/tfds_salicon'
+    else:
+        dataset_path = args.dataset_dir
+
     print("Data: salicon")
-    train_loader = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
-    test_loader = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
+    
+    train_loader = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
+    test_loader = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')
+
+    # train_loader = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
+    # test_loader = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
 
 # train_loader = train_loader.take(100)
 # test_loader = test_loader.take(100)
@@ -117,7 +135,7 @@ else:
 if args.enc_model == "vgg":
     print("VGG Model")
     from model import VGGModel
-    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=kldiv)
+    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function= kldiv)
     train_loader = preprocessing(train_loader,args)
     test_loader = preprocessing(test_loader,args)
 
@@ -127,17 +145,17 @@ if args.enc_model == "vgg":
 elif args.enc_model == "multimodal":
     print("Multimodal Model")
     from model import MultimodalModel
-    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=kldiv)
+    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=tf.keras.losses.BinaryCrossentropy())
     train_loader = preprocessing_multi(train_loader,args)
     test_loader = preprocessing_multi(test_loader,args)
     multi = True
 
-if tf.test.is_gpu_available():
-    print("Use GPU")
-    devices = tf.coonfig.kist_physical_devices('GPU')
-    tf.config.experimental.set_memory_growth(devices[0], True)
-else: 
-    print("Use CPU")
+# if tf.test.is_gpu_available():
+#     print("Use GPU")
+#     devices = tf.coonfig.kist_physical_devices('GPU')
+#     tf.config.experimental.set_memory_growth(devices[0], True)
+# else: 
+#     print("Use CPU")
 
 
 
