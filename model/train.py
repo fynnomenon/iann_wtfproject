@@ -148,10 +148,10 @@ else:
 if args.model == "vgg":
     print("VGG Model")
     from model import VGGModel
+    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function= kldiv)
     if args.load_model:
-        tf.keras.saving.load_model("/content/drive/MyDrive/Project ANN/saved_model_vgg", custom_objects=None, compile=True, safe_mode=True, **kwargs)
-    else:
-        model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function= kldiv)
+        model.load_weights("/content/drive/MyDrive/Project ANN/saved_model_vgg")
+
     train_ds = preprocessing(train_ds,args)
     test_ds = preprocessing(test_ds,args)
 
@@ -161,10 +161,9 @@ if args.model == "vgg":
 elif args.model == "multimodal":
     print("Multimodal Model")
     from model import MultimodalModel
+    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function=kldiv)
     if args.load_model:
-        tf.keras.saving.load_model("/content/drive/MyDrive/Project ANN/saved_model_multimodal", custom_objects=None, compile=True, safe_mode=True, **kwargs)
-    else:
-        model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function=kldiv)
+        model.load_weights("/content/drive/MyDrive/Project ANN/saved_model_multimodal")
     train_ds = preprocessing_multi(train_ds,args)
     test_ds = preprocessing_multi(test_ds,args)
     multi = True
@@ -268,7 +267,7 @@ def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_w
     print("\n")
     if args.save:
         if args.colab:
-            tf.keras.saving.save_model(model,"/content/drive/MyDrive/Project ANN/saved_model"+"_" + args.model)
+            model.save_weights("/content/drive/MyDrive/Project ANN/saved_model"+"_" + args.model)
 
     
 
