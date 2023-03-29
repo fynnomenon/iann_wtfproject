@@ -1,6 +1,7 @@
 """
 @authors: faurand, chardes, ehagensieker
 """
+
 import argparse
 import glob
 import os
@@ -27,6 +28,7 @@ import tensorflow.keras.backend as K
 import tensorflow.keras.losses as losses
 import matplotlib
 matplotlib.use('Agg')
+
 import matplotlib.pyplot as plt
 from PIL import Image
 
@@ -45,7 +47,7 @@ parser.add_argument('--sim',default=False, type=bool)
 parser.add_argument('--nss_emlnet',default=False, type=bool)
 parser.add_argument('--nss_norm',default=False, type=bool)
 parser.add_argument('--l1',default=False, type=bool)
-parser.add_argument('--lr_sched',default=True, type=bool)
+parser.add_argument('--lr_sched',default=False, type=bool)
 parser.add_argument('--dilation',default=False, type=bool)
 parser.add_argument('--model',default="vgg", type=str)
 parser.add_argument('--optim',default="Adam", type=str)
@@ -103,13 +105,13 @@ if args.lr_sched:
     optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler)
 
 def preprocessing(data,args):
-    data = data.map(lambda img,_,sal: (img,tf.squeeze(sal,axis = 2)))
-    data = data.batch(args.batch_size).shuffle(True).prefetch(buffer_size=tf.data.AUTOTUNE)
+    data = data.map(lambda img,_,sal: (tf.convert_to_tensor(img, dtype=tf.float32),tf.convert_to_tensor(tf.cast(tf.squeeze(sal,axis = 2), dtype=tf.float32))))
+    data = data.shuffle(514).batch(args.batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
     return data
 def preprocessing_multi(data,args):
-    data = data.map(lambda img,cap,sal: (img,(tf.cast(cap, dtype=tf.float32),tf.squeeze(sal,axis = 2))))
+    data = data.map(lambda img,cap,sal: ((tf.convert_to_tensor(img, dtype=tf.float32),tf.convert_to_tensor(tf.cast(cap, dtype=tf.float32), dtype=tf.float32)),tf.convert_to_tensor(tf.cast(tf.squeeze(sal,axis = 2), dtype=tf.float32))))
     #data = data.map(lambda img,cap,sal: (img,(tf.tile(tf.expand_dims(cap, 1),[1, 14, 14, 1]),tf.squeeze(sal,axis = 2))))
-    data = data.batch(args.batch_size).shuffle(True).prefetch(buffer_size=tf.data.AUTOTUNE)
+    data = data.shuffle(514).batch(args.batch_size).prefetch(buffer_size=tf.data.AUTOTUNE)
     return data
 
 if args.data == 'cap_gaze':
@@ -201,6 +203,34 @@ def create_summary_writers(config_name):
     val_summary_writer = tf.summary.create_file_writer(val_log_path)
 
     return train_summary_writer, val_summary_writer
+
+def generate_images(model, test_input,epoch,data): 
+    
+    input,target = test_input
+    pred = model(input, training = False)
+
+    
+    fig,axes = plt.subplots(nrows=2,ncols=5)
+    
+
+    #visualization 
+    for col in range(5):
+    
+        axes[0][col].imshow(pred[col])
+        axes[0][col].set_title(str(col+1) + ". pre")
+        axes[1][col].imshow(target[col])
+        axes[1][col].set_title(str(col+1) + ". sal_map")
+
+        axes[0][col].axis('off')
+        axes[1][col].axis('off')
+    #axes[0].set_title
+        
+    fig.tight_layout()
+
+    plt.savefig("/content/drive/MyDrive/Project ANN/images/epoch_"+ data + "_" + str(epoch))
+
+    plt.show()
+
    
 
 def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_writer):
@@ -211,24 +241,21 @@ def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_w
     total_loss = 0.0
     cur_loss = 0.0
     #idx = 0
-    
-    
 
-    for (img, cap_gt) in tqdm.tqdm(train_ds, position = 0, leave = True):
+    
+    idx = 0
+   
+
+
+    for data in tqdm.tqdm(train_ds, position = 0, leave = True):
     
     #for idx, (img, gt, fixations) in enumerate(loader):
+        if idx == 0:
+            visualize_train = data
+            idx += 1
         
-        img = tf.convert_to_tensor(img, dtype=tf.float32)
-        if multi:
-            cap = cap_gt[0]
-            gt = cap_gt[1]
-            cap = tf.convert_to_tensor(cap, dtype=tf.float32)
-            gt = tf.convert_to_tensor(gt, dtype=tf.float32)
-            metrics = model.train_step(img,cap,gt)
+        metrics = model.train_step(data)
 
-        else: 
-            gt = tf.convert_to_tensor(cap_gt, dtype=tf.float32)
-            metrics = model.train_step(img,gt)
         #fixations = tf.convert_to_tensor(fixations, dtype=tf.float32)
         with train_summary_writer.as_default(): 
                 for metric in model.metrics: 
@@ -241,24 +268,26 @@ def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_w
     #reset metric 
     model.reset_metrics()
 
+    generate_images(model, visualize_train,epoch,'train')
+  
 #evaluation on validation set
-    for (img,cap_gt) in tqdm.tqdm(val_ds, position = 0, leave = True):
-        img = tf.convert_to_tensor(img, dtype=tf.float32)
-        if multi:
-            cap = cap_gt[0]
-            gt = cap_gt[1]
-            cap = tf.convert_to_tensor(cap, dtype=tf.float32)
-            gt = tf.convert_to_tensor(gt, dtype=tf.float32)
-            metrics = model.test_step(img, cap,gt)
-        else: 
-            gt = tf.convert_to_tensor(cap_gt, dtype=tf.float32)
-            metrics = model.test_step(img,gt)
+
+    idx = 0
+ 
+    for data in tqdm.tqdm(val_ds, position = 0, leave = True):
+        
+        if idx == 0:
+            visualize_test = data
+            idx += 1
+
+        metrics = model.test_step(data)
 
         with val_summary_writer.as_default():
             for metric in model.metrics:
                 tf.summary.scalar(f"{metric.name}", metric.result(), step=epoch)
 
     # print the metrics and add to history element
+    print("\n")
     for key, value in metrics.items():
         print(f"test_{key}: {value.numpy()}")
 
@@ -268,7 +297,10 @@ def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_w
     if args.save:
         if args.colab:
             model.save_weights("/content/drive/MyDrive/Project ANN/saved_model"+"_" + args.model)
-
+    generate_images(model, visualize_test,epoch,'test')
+    
+    
+    
     
 
 

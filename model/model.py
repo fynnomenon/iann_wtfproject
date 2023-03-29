@@ -169,7 +169,8 @@ class VGGModel(tf.keras.Model):
             metric.reset_states()
 
 
-    def train_step(self,img,gt):
+    def train_step(self,data):
+        img,gt = data
         with tf.GradientTape() as tape: 
             pred_map = self(img,training = True)
       
@@ -188,7 +189,8 @@ class VGGModel(tf.keras.Model):
 
         return {m.name : m.result() for m in self.metrics}
     
-    def test_step(self,img,gt):
+    def test_step(self,data):
+        img,gt = data
         
         
         pred_map = self(img,training = False)
@@ -271,7 +273,9 @@ class MultimodalModel(tf.keras.Model):
         self.dense_layer = tf.keras.layers.Dense(196, activation='relu')
         self.reshape_layer = tf.keras.layers.Reshape((14, 14, 1))
 
-    def call(self, images,text_embedding,dense=True,training=False):
+    def call(self, input,dense=True,training=False):
+        images,text_embedding = input
+
         batch_size = images.shape[0]
         
         
@@ -360,9 +364,10 @@ class MultimodalModel(tf.keras.Model):
             metric.reset_states()
 
 
-    def train_step(self,img,cap,gt):
+    def train_step(self,data):
+        input,gt = data
         with tf.GradientTape() as tape: 
-            pred_map = self(img,cap,training = True)
+            pred_map = self(input,training = True)
       
             assert pred_map.shape == gt.shape
             
@@ -379,10 +384,10 @@ class MultimodalModel(tf.keras.Model):
 
         return {m.name : m.result() for m in self.metrics}
     
-    def test_step(self,img,cap,gt):
+    def test_step(self,data):
+        input,gt = data
         
-        
-        pred_map = self(img,cap,training = False)
+        pred_map = self(input,training = False)
     
         assert pred_map.shape == gt.shape
         
