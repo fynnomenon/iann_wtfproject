@@ -35,7 +35,7 @@ from PIL import Image
 #all arguments that can be choosen/where we can choose between different options (can delete some losses)
 parser = argparse.ArgumentParser()
 
-parser.add_argument('--no_epochs',default=5, type=int)
+parser.add_argument('--no_epochs',default=40, type=int)
 
 parser.add_argument('--lr',default=1e-4, type=float)
 parser.add_argument('--kldiv',default=True, type=bool)
@@ -45,9 +45,9 @@ parser.add_argument('--sim',default=False, type=bool)
 parser.add_argument('--nss_emlnet',default=False, type=bool)
 parser.add_argument('--nss_norm',default=False, type=bool)
 parser.add_argument('--l1',default=False, type=bool)
-parser.add_argument('--lr_sched',default=False, type=bool)
+parser.add_argument('--lr_sched',default=True, type=bool)
 parser.add_argument('--dilation',default=False, type=bool)
-parser.add_argument('--enc_model',default="vgg", type=str)
+parser.add_argument('--model',default="vgg", type=str)
 parser.add_argument('--optim',default="Adam", type=str)
 
 parser.add_argument('--load_weight',default=1, type=int)
@@ -69,6 +69,9 @@ parser.add_argument('--no_workers',default=4, type=int)
 parser.add_argument('--model_val_path',default="model.pt", type=str)
 parser.add_argument('--data',default='salicon', type=str)
 parser.add_argument('--colab',default=True, type=bool)
+parser.add_argument('--save',default=False, type=bool)
+parser.add_argument('--load_model',default=False, type=bool)
+
 
 #run parser and place extracted data in args
 # 
@@ -88,6 +91,16 @@ val_img_dir = args.dataset_dir + "images/val/"
 val_gt_dir = args.dataset_dir + "maps/val/"
 val_fix_dir = args.dataset_dir + "fixations/fixations/"
 
+#choose the optimizer you wanna test
+if args.optim=="Adam":
+    optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
+if args.optim=="Adagrad":
+    optimizer = tf.keras.optimizers.Adagrad(learning_rate=args.lr)
+if args.optim=="SGD":
+    optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr, momentum = 0.9)
+if args.lr_sched:
+    scheduler = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=args.lr, decay_steps=args.step_size, decay_rate=0.1)
+    optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler)
 
 def preprocessing(data,args):
     data = data.map(lambda img,_,sal: (img,tf.squeeze(sal,axis = 2)))
@@ -101,7 +114,7 @@ def preprocessing_multi(data,args):
 
 if args.data == 'cap_gaze':
     if args.colab:
-        dataset_path = '/content/drive/MyDrive/project_ann/tfds_capgaze1'
+        dataset_path = '/content/drive/MyDrive/Project ANN/tfds_capgaze1'
     else:
         dataset_path = '../tfds_capgaze1'
         
@@ -110,44 +123,50 @@ if args.data == 'cap_gaze':
     
     ds = tf.data.Dataset.load(dataset_path)
     ds = tf.data.Dataset.load('../tfds_capgaze1', compression='GZIP')
-    train_loader = ds.skip(200)
-    test_loader = ds.take(200)
+    train_ds = ds.skip(200)
+    test_ds = ds.take(200)
     
     
 else:
     if args.colab:
-        dataset_path = '/content/drive/MyDrive/project_ann/tfds_salicon'
+        dataset_path = '/content/drive/MyDrive/Project ANN/tfds_salicon'
     else:
         dataset_path = args.dataset_dir
 
     print("Data: salicon")
     
-    train_loader = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
-    test_loader = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')
+    train_ds = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
+    test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')
 
-    # train_loader = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
-    # test_loader = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
+    # train_ds = tf.data.Dataset.load('../tfds_salicon/train2014', compression='GZIP')
+    # test_ds = tf.data.Dataset.load('../tfds_salicon/val2014', compression='GZIP')
 
-# train_loader = train_loader.take(100)
-# test_loader = test_loader.take(100)
+# train_ds = train_ds.take(100)
+# test_ds = test_ds.take(100)
 
     
-if args.enc_model == "vgg":
+if args.model == "vgg":
     print("VGG Model")
     from model import VGGModel
-    model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function= kldiv)
-    train_loader = preprocessing(train_loader,args)
-    test_loader = preprocessing(test_loader,args)
+    if args.load_model:
+        tf.keras.saving.load_model("/content/drive/MyDrive/Project ANN/saved_model_vgg", custom_objects=None, compile=True, safe_mode=True, **kwargs)
+    else:
+        model = VGGModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function= kldiv)
+    train_ds = preprocessing(train_ds,args)
+    test_ds = preprocessing(test_ds,args)
 
     multi = False
 
 
-elif args.enc_model == "multimodal":
+elif args.model == "multimodal":
     print("Multimodal Model")
     from model import MultimodalModel
-    model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,loss_function=tf.keras.losses.BinaryCrossentropy())
-    train_loader = preprocessing_multi(train_loader,args)
-    test_loader = preprocessing_multi(test_loader,args)
+    if args.load_model:
+        tf.keras.saving.load_model("/content/drive/MyDrive/Project ANN/saved_model_multimodal", custom_objects=None, compile=True, safe_mode=True, **kwargs)
+    else:
+        model = MultimodalModel(train_enc=bool(args.train_enc), load_weight=args.load_weight,optimizer=optimizer,loss_function=kldiv)
+    train_ds = preprocessing_multi(train_ds,args)
+    test_ds = preprocessing_multi(test_ds,args)
     multi = True
 
 # if tf.test.is_gpu_available():
@@ -185,7 +204,7 @@ def create_summary_writers(config_name):
     return train_summary_writer, val_summary_writer
    
 
-def train(model, optimizer, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_writer):
+def train(model, train_ds, val_ds,epoch, args,train_summary_writer,val_summary_writer):
     #loader - loads batches of the data/provides batches of input data 
     #model.train()
     tic = time.time()
@@ -247,7 +266,10 @@ def train(model, optimizer, train_ds, val_ds,epoch, args,train_summary_writer,va
     #reset metric
     model.reset_metrics()
     print("\n")
-    
+    if args.save:
+        if args.colab:
+            tf.keras.saving.save_model(model,"/content/drive/MyDrive/Project ANN/saved_model"+"_" + args.model)
+
     
 
 
@@ -300,25 +322,16 @@ def validate(model, loader, epoch, args):
 
 #params = list(filter(lambda p: p.requires_grad, model.parameters())) 
 
-#choose the optimizer you wanna test
-if args.optim=="Adam":
-    optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
-if args.optim=="Adagrad":
-    optimizer = tf.keras.optimizers.Adagrad(learning_rate=args.lr)
-if args.optim=="SGD":
-    optimizer = tf.keras.optimizers.SGD(learning_rate=args.lr, momentum = 0.9)
-if args.lr_sched:
-    scheduler = tf.keras.optimizers.schedules.ExponentialDecay(initial_learning_rate=args.lr, decay_steps=args.step_size, decay_rate=0.1)
-    optimizer = tf.keras.optimizers.Adam(learning_rate=scheduler)
+
 
 for epoch in range(0, args.no_epochs):
     train_summary_writer, val_summary_writer = create_summary_writers(config_name = f'RUN')
     
-    train(model, optimizer, train_loader,test_loader, epoch, args,train_summary_writer,val_summary_writer)
+    train(model, train_ds,test_ds, epoch, args,train_summary_writer,val_summary_writer)
     
  
 
-    # cc_loss = validate(model, test_loader, epoch, args)
+    # cc_loss = validate(model, test_ds, epoch, args)
     # if epoch == 0:
     #     best_loss = cc_loss.numpy()
     # if best_loss < cc_loss.numpy():

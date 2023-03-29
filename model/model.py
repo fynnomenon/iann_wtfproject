@@ -81,7 +81,7 @@ class VGGModel(tf.keras.Model):
             tf.keras.layers.Activation('sigmoid')
         ])
 
-    def call(self, images):
+    def call(self, images, training=False):
         batch_size = images.shape[0]
         
         
@@ -271,22 +271,22 @@ class MultimodalModel(tf.keras.Model):
         self.dense_layer = tf.keras.layers.Dense(196, activation='relu')
         self.reshape_layer = tf.keras.layers.Reshape((14, 14, 1))
 
-    def call(self, images,text_embedding,dense=True):
+    def call(self, images,text_embedding,dense=True,training=False):
         batch_size = images.shape[0]
         
         
-        out1 = self.conv_layer1(images)
+        out1 = self.conv_layer1(images,training=training)
         
         #print(out1.shape)
-        out2 = self.conv_layer2(out1)
+        out2 = self.conv_layer2(out1,training=training)
         #print(out2.shape)
-        out3 = self.conv_layer3(out2)
+        out3 = self.conv_layer3(out2,training=training)
         #print(out3.shape)
-        out4 = self.conv_layer4(out3)
+        out4 = self.conv_layer4(out3,training=training)
         #print(out4.shape)
-        out5 = self.conv_layer5(out4)
+        out5 = self.conv_layer5(out4,training=training)
         #print(out5.shape)
-        out5 = self.linear_upsampling(out5)
+        out5 = self.linear_upsampling(out5,training=training)
         
         # out4 = self.linear_upsampling(out4) #zusätzlich hinzugefügt weil sonst outputs nicht übereinstimmen (in pytorch schon, in tensorflow kommt anderer output raus)
 
@@ -299,8 +299,8 @@ class MultimodalModel(tf.keras.Model):
         #print(out4.shape)
         #shape=(1, 768)
         if dense:
-            text_embedding = self.dense_layer(text_embedding)
-            text_embedding = self.reshape_layer(text_embedding)
+            text_embedding = self.dense_layer(text_embedding,training=training)
+            text_embedding = self.reshape_layer(text_embedding,training=training)
         else:
             text_embedding = tf.expand_dims(text_embedding, 1)
             text_embedding = tf.tile(text_embedding, [1, 14, 14, 1])
@@ -312,7 +312,7 @@ class MultimodalModel(tf.keras.Model):
         #assert x.shape == (batch_size, 16, 16, 1024)
         #assert x.shape == (batch_size, 14, 14, 1024)
         
-        x = self.deconv_layer1(x)
+        x = self.deconv_layer1(x,training=training)
         
         #assert x.shape == (batch_size, 32, 32, 512)
         #assert x.shape == (batch_size, 28, 28, 512)
@@ -321,7 +321,7 @@ class MultimodalModel(tf.keras.Model):
         x = tf.concat([x, out3], axis=3)
         #assert x.shape == (batch_size, 32, 32, 1024)
         #assert x.shape == (batch_size, 28, 28, 1024)
-        x = self.deconv_layer2(x)
+        x = self.deconv_layer2(x,training=training)
         
         #assert x.shape == (batch_size, 64, 64, 256)
         #assert x.shape == (batch_size, 56, 56, 256)
@@ -330,15 +330,15 @@ class MultimodalModel(tf.keras.Model):
        
         #assert x.shape == (batch_size, 64, 64, 512)
         #assert x.shape == (batch_size, 56, 56, 512)
-        x = self.deconv_layer3(x)
+        x = self.deconv_layer3(x,training=training)
         #assert x.shape == (batch_size, 128, 128, 128)
         #assert x.shape == (batch_size, 112, 112, 128)
         
         x = tf.concat([x, out1], axis=3)
         #assert x.shape == (batch_size, 128, 128, 256)
         #assert x.shape == (batch_size, 112, 112, 256)
-        x = self.deconv_layer4(x)
-        x = self.deconv_layer5(x)
+        x = self.deconv_layer4(x,training=training)
+        x = self.deconv_layer5(x,training=training)
         #assert x.shape == (batch_size, 256, 256, 1)
        # assert x.shape == (batch_size, 224, 224, 1)
        
