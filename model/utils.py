@@ -30,13 +30,14 @@ def create_summary_writers(args, config_name, results_dir):
 
 def _deprocess_img(processed_img):
     '''
-    Generate images with saliency map on it
-
-    Arguments:
-        processed_img: Tensor
-            image to be processed
-    Returns:
-        img: Tensor
+    Takes a preprocessed image used by VGG-16 and returns the corresponding original image. This is done
+    by adding the mean pixel values, reversing the color channel back to RGB and clipping the values. 
+    Arguments: 
+        processed_img:tensor
+            Preprocessed image in shape(1,224,224)
+    Returns: 
+        img:tensor
+            Original image in tf.uint8 format with shape(224,224,3).
     '''
     imagenet_means = [103.939, 116.779, 123.68]
     means = tf.reshape(tf.constant(imagenet_means), [1, 1, 3])
