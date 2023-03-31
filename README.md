@@ -73,12 +73,12 @@ data/
 │           └── 2008_008755.json
 ├── SALICON/
 |   ├── annotations/
-|   |	  ├── train/
-|   |	  |   ├── captions_train2014.json
-|   |	  |   └── fixations_train2014.json
-|   |   └── val/
-|   |       ├── captions_val2014.json
-|   |       └── fixations_val2014.json
+│   │   ├── train/
+│   │   │   ├── captions_train2014.json
+│   │   │   └── fixations_train2014.json
+│   │   └── val/
+│   │       ├── captions_val2014.json
+│   │       └── fixations_val2014.json
 |   └── images/
 |       ├── train/
 |       |   ├── COCO_train2014_000000000009.jpg
