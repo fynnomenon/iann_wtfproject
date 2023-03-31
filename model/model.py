@@ -97,7 +97,7 @@ class BaselineModel(tf.keras.Model):
             tf.keras.layers.Conv2D(filters = 1, kernel_size = 3, padding = 'same',activation='sigmoid', use_bias=True,kernel_regularizer=kernel_regularizer),
         ])
 
-    def call(self, images, training=False):
+    def call(self, images,_, training=False):
         '''
         Perform operations on an input image to generate a saliency map.
 
@@ -165,7 +165,7 @@ class BaselineModel(tf.keras.Model):
         img,gt = data
 
         with tf.GradientTape() as tape: 
-            pred_map = self(img,training = True)
+            pred_map = self(img,_,training = True)
             assert pred_map.shape == gt.shape
             loss = self.loss_function(pred_map, gt)
             
@@ -196,7 +196,7 @@ class BaselineModel(tf.keras.Model):
         '''
         img,gt = data
          
-        pred_map = self(img,training = False)
+        pred_map = self(img,_,training = False)
         assert pred_map.shape == gt.shape
         loss = self.loss_function(pred_map, gt)
         
