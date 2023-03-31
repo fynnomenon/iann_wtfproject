@@ -10,8 +10,6 @@ from utils import create_summary_writers, save_hist
 from train import train
 from validate import validate
 import matplotlib.pyplot as plt
-import datetime
-
 
 # Select various options for training the model. The default values are stated in each argument
 parser = argparse.ArgumentParser()
@@ -22,6 +20,7 @@ parser.add_argument('--colab', default=1, type=int)
 parser.add_argument('--model', default="baseline", type=str)
 parser.add_argument('--save', default=0, type=int)
 parser.add_argument('--load_model', default=0, type=int)
+parser.add_argument('--config_name', default=None, type=str)
 
 parser.add_argument('--use_pretrained', default=1, type=int)
 parser.add_argument('--fine_tune', default=0, type=int)
@@ -35,7 +34,7 @@ parser.add_argument('--l1_norm', default=None, type=float)
 parser.add_argument('--l2_norm', default=None, type=float)
 
 parser.add_argument('--start_epoch',default=0,type=int)
-parser.add_argument('--no_epochs', default=24, type=int)
+parser.add_argument('--no_epochs', default=14, type=int)
 parser.add_argument('--batch_size', default=32, type=int)
 
 #run parser and place extracted data in args object
@@ -97,6 +96,9 @@ else:
     
     train_ds = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
     test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')  
+    
+train_ds = train_ds.take(100)
+test_ds = test_ds.take(50)
 
 #choose the optimizer you wanna test
 if args.optim=="Adam":
@@ -111,8 +113,6 @@ if args.lr_sched:
 
 # Set up directories to store the results
 results_dir=f'{parent_dir}/results'
-current_time = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
-config_name = f'{args.model}_{args.data}_{current_time}'
 
 # Choose the model to be used
 if args.model == "baseline":
@@ -137,16 +137,17 @@ elif args.model == "multimodal":
 hist = {"train_loss":[],"train_AUC":[],"train_CC":[],"train_NSS":[],"train_KLDiv":[],"train_SIM":[],"test_loss":[],"test_AUC":[],"test_CC":[],"test_NSS":[],"test_KLDiv":[],"test_SIM":[]}
 hist_val = {"test_loss":[],"test_AUC":[],"test_CC":[],"test_NSS":[],"test_KLDiv":[],"test_SIM":[]}
 
-#validate test dataset before training
-val_config_name = config_name + "_val"
-train_summary_writer, val_summary_writer = create_summary_writers(args, val_config_name, results_dir)
-hist_val = validate(model, test_ds, -1, args, val_summary_writer, hist_val, val_config_name, results_dir)
-save_hist(hist_val,val_config_name, results_dir)
+if args.start_epoch == 0:
+    #validate test dataset before training
+    print('Model performance before training:')
+    val_config_name = args.config_name + "_val"
+    train_summary_writer, val_summary_writer = create_summary_writers(args, val_config_name, results_dir)
+    hist_val = validate(model, test_ds, -1, args, val_summary_writer, hist_val, val_config_name, results_dir)
+    save_hist(hist_val, -1, val_config_name, results_dir)
 
 # Train/test the model        
 for epoch in range(args.start_epoch,args.no_epochs):   
     print("Epoch: ",epoch)    
-    train_summary_writer, val_summary_writer = create_summary_writers(args, config_name, results_dir)
-    hist = train(model, train_ds, test_ds, epoch, args, train_summary_writer, val_summary_writer, hist, config_name, results_dir)
-    
-save_hist(hist, config_name, results_dir)
+    train_summary_writer, val_summary_writer = create_summary_writers(args, args.config_name, results_dir)
+    hist = train(model, train_ds, test_ds, epoch, args, train_summary_writer, val_summary_writer, hist, args.config_name, results_dir)
+    save_hist(hist, epoch, args.config_name, results_dir)

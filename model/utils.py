@@ -1,6 +1,7 @@
 import tensorflow as tf
 import os
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 
 def create_summary_writers(args, config_name, results_dir):
@@ -106,21 +107,23 @@ def generate_images(model, test_input, args, epoch, data, config_name, results_d
     plt.savefig(f"{image_dir}/epoch_{data}_{str(epoch)}")
     plt.close()
                                  
-def save_hist(hist, config_name, results_dir):
+def save_hist(hist, epoch, config_name, results_dir):
     '''
-    Saves a directory of the training history to a csv file.
+    Saves the training history to a csv file.
     Arguments:
-    hist:dict
-    A dictionary containing the training history data.
-    config_name:str
-    The name of the configuration used to generate the training history data.
-    results_dir:str
-    The directory where the training history file should be saved.
+        hist:dict
+            A dictionary containing the training history data.
+        epoch:int
+            Represents the current epoch of the training
+        config_name:str
+            The name of the configuration used to generate the training history data.
+        results_dir:str
+            The directory where the training history file should be saved.
     Returns:
-    None
+        None
     '''
-    hist_dir = f'{results_dir}/history'
+    hist_dir = f'{results_dir}/history/{config_name}'
     if not os.path.exists(hist_dir):
         os.makedirs(hist_dir)
     
-    pd.DataFrame.from_dict(hist).to_csv(f'{hist_dir}/{config_name}.csv', index=False)
+    pd.DataFrame.from_dict(hist).to_csv(f'{hist_dir}/epoch_{epoch}.csv', index=False)
