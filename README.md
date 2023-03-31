@@ -17,7 +17,7 @@ This repository contains:
 
 After you have downloaded everything, unzip it and place it so that the folder structure of [data](data) looks like this:
 
-```shell
+```
 data/
 ├── capgaze1/
 │   ├── gaze_converted_2/
