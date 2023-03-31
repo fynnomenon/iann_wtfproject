@@ -105,7 +105,7 @@ python dataloader_salicon.py
 
 ### Models 🤖
 
-The full source code for our models can be found in the folder [model](model). They can either be run directly from the command line or within Google Colab. 
+The full source code for our models can be found in the folder [model](model). They can either be run directly from the command line or within Google Colab. By passing arguments to the main.py file, you can choose whether to use the baseline or multimodal model. See the table below for all the different arguments you can use: 
 
 |     Argument     |  Defaul  |   Options   |
 | :--------------: | :------: | :---------: |
@@ -144,6 +144,3 @@ python main.py --model multimodal --data capgaze1 --config_name multimodal_SALIC
 python main.py --model baseline --data capgaze1 --config_name multimodal_SALICON_v1 
 --fine_tune 2 --start_epoch 0 --no_epochs 10 --load 1
 ```
-
-
-
