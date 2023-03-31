@@ -17,7 +17,6 @@ This repository contains:
 
 After you have downloaded everything, unzip it and place it so that the folder structure of [data](data) looks like this:
 
-```
 data/
 ├── capgaze1/
 │   ├── gaze_converted_2/
@@ -91,7 +90,6 @@ data/
 ├── dataloader_capgaze1.py
 ├── dataloader_salicon.py
 └── DatasetInspection.ipynb
-```
 
 Then you can create the two datasets and store them as as `TFRecords` dataset:
 
