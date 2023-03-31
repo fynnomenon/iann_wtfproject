@@ -81,8 +81,8 @@ class CC(tf.keras.metrics.Mean):
 class NSS(tf.keras.metrics.Mean):
     '''
     Computes the Normalized Scanpath Saliency (NSS) between the predicted and ground truth saliency map.
-    It calculates the mean of the normalized saliency map values and measures the correlation between the 
-    predicted and ground truth saliency map.
+    It calculates the mean of the normalized saliency map values at fixation locations.
+    (Larger value implies better performance.)
     '''
     def __init__(self, eps=2.2204e-16):
         '''
