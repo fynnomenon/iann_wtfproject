@@ -97,9 +97,6 @@ else:
     train_ds = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
     test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')  
     
-train_ds = train_ds.take(100)
-test_ds = test_ds.take(50)
-
 #choose the optimizer you wanna test
 if args.optim=="Adam":
     optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)
