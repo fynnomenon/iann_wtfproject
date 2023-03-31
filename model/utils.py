@@ -31,13 +31,13 @@ def create_summary_writers(args, config_name, results_dir):
 def _deprocess_img(processed_img):
     '''
     Takes a preprocessed image used by VGG-16 and returns the corresponding original image. This is done
-    by adding the mean pixel values, reversing the color channel back to RGB and clipping the values. 
-    Arguments: 
-        processed_img:tensor
-            Preprocessed image in shape(1,224,224)
-    Returns: 
-        img:tensor
-            Original image in tf.uint8 format with shape(224,224,3).
+    by adding the mean pixel values, reversing the color channel back to RGB and clipping the values.
+    Arguments:
+    processed_img:tensor
+    Preprocessed image in shape(1,224,224)
+    Returns:
+    img:tensor
+    Original image in tf.uint8 format with shape(224,224,3).
     '''
     imagenet_means = [103.939, 116.779, 123.68]
     means = tf.reshape(tf.constant(imagenet_means), [1, 1, 3])
@@ -85,13 +85,13 @@ def generate_images(model, test_input, args, epoch, data, config_name, results_d
         axes[row][0].set_title(str(row+1) + ". Predicted")
         
         axes[row][1].imshow(_deprocess_img(img))
-        axes[row][1].imshow(pred[row], cmap='plasma', alpha=0.7, interpolation='bilinear')
+        axes[row][1].imshow(pred[row], cmap='plasma', alpha=0.5, interpolation='bilinear')
         
         axes[row][2].imshow(target[row], cmap='plasma')
         axes[row][2].set_title(str(row+1) + ". Original")
         
         axes[row][3].imshow(_deprocess_img(img))
-        axes[row][3].imshow(target[row], cmap='plasma', alpha=0.7, interpolation='bilinear')
+        axes[row][3].imshow(target[row], cmap='plasma', alpha=0.5, interpolation='bilinear')
         
         axes[row][0].axis('off')
         axes[row][1].axis('off')
@@ -107,6 +107,18 @@ def generate_images(model, test_input, args, epoch, data, config_name, results_d
     plt.close()
                                  
 def save_hist(hist, config_name, results_dir):
+    '''
+    Saves a directory of the training history to a csv file.
+    Arguments:
+    hist:dict
+    A dictionary containing the training history data.
+    config_name:str
+    The name of the configuration used to generate the training history data.
+    results_dir:str
+    The directory where the training history file should be saved.
+    Returns:
+    None
+    '''
     hist_dir = f'{results_dir}/history'
     if not os.path.exists(hist_dir):
         os.makedirs(hist_dir)

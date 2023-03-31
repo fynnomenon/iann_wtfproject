@@ -87,13 +87,15 @@ if args.data == 'capgaze1':
     dataset_path = f'{parent_dir}/data/tfds_capgaze1'
     
     ds = tf.data.Dataset.load(dataset_path, compression='GZIP')
+    train_ds = ds.skip(200)
+    test_ds = ds.take(200)
 
 else:
     print("Data: SALICON")
     dataset_path = f'{parent_dir}/data/tfds_salicon'
     
     train_ds = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
-    test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')   
+    test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')  
 
 #choose the optimizer you wanna test
 if args.optim=="Adam":
@@ -114,52 +116,35 @@ config_name = f'{args.model}_{args.data}_{current_time}'
 # Choose the model to be used
 if args.model == "baseline":
     print("Model: Baseline Model")
-    model = BaselineModel(fine_tune=args.fine_tune, use_pretrained=args.use_pretrained,loss_function=KLDivergence(), optimizer=optimizer,l1_norm=args.l1_norm,l2_norm=args.l2_norm)
+    model = BaselineModel(fine_tune=args.fine_tune, use_pretrained=args.use_pretrained,loss_function=KLDivergence(), optimizer=optimizer,L1_norm=args.l1_norm,L2_norm=args.l2_norm)
     if args.load_model:
         model.load_weights(f"{results_dir}/saved_model_baseline")
-    if args.data == 'capgaze1':
-        ds = preprocessing(ds,args)
-    else:
-        train_ds = preprocessing(train_ds,args)
-        test_ds = preprocessing(test_ds,args)
+
+    train_ds = preprocessing(train_ds,args)
+    test_ds = preprocessing(test_ds,args)
 
 elif args.model == "multimodal":
     print("Model: Multimodal Model")
-    model = MultimodalModel(fine_tune=args.fine_tune, use_pretrained=args.use_pretrained, loss_function=KLDivergence(),optimizer=optimizer,l1_norm=args.l1_norm,l2_norm=args.l2_norm)
+    model = MultimodalModel(fine_tune=args.fine_tune, use_pretrained=args.use_pretrained, loss_function=KLDivergence(),optimizer=optimizer,L1_norm=args.l1_norm,L2_norm=args.l2_norm)
     if args.load_model:
         model.load_weights(f"{results_dir}/saved_model_multimodal")
-    if args.data == 'capgaze1':
-        ds = preprocessing_multi(ds,args)
-    else:
-        train_ds = preprocessing_multi(train_ds,args)
-        test_ds = preprocessing_multi(test_ds,args)
+   
+    train_ds = preprocessing_multi(train_ds,args)
+    test_ds = preprocessing_multi(test_ds,args)
 
 #to visualize the losses later
-hist = {"train_loss":[],
-        "train_AUC":[],
-        "train_CC":[],
-        "train_NSS":[],
-        "train_KLDiv":[],
-        "train_SIM":[],
-        "test_loss":[],
-        "test_AUC":[],
-        "test_CC":[],
-        "test_NSS":[],
-        "test_KLDiv":[],
-        "test_SIM":[]}
-hist_val = {"test_loss":[],
-            "test_AUC":[],
-            "test_CC":[],
-            "test_NSS":[],
-            "test_KLDiv":[],
-            "test_SIM":[]}
+hist = {"train_loss":[],"train_AUC":[],"train_CC":[],"train_NSS":[],"train_KLDiv":[],"train_SIM":[],"test_loss":[],"test_AUC":[],"test_CC":[],"test_NSS":[],"test_KLDiv":[],"test_SIM":[]}
+hist_val = {"test_loss":[],"test_AUC":[],"test_CC":[],"test_NSS":[],"test_KLDiv":[],"test_SIM":[]}
+
+#validate test dataset before training
+val_config_name = config_name + "_val"
+train_summary_writer, val_summary_writer = create_summary_writers(args, val_config_name, results_dir)
+hist_val = validate(model, test_ds, -1, args, val_summary_writer, hist_val, val_config_name, results_dir)
+save_hist(hist_val,val_config_name, results_dir)
 
 # Train/test the model        
 for epoch in range(0, args.no_epochs):        
     train_summary_writer, val_summary_writer = create_summary_writers(args, config_name, results_dir)
-    if args.data == 'capgaze1':
-        hist = validate(model, ds, epoch, args, val_summary_writer, hist_val, config_name, results_dir)
-    else:
-        hist = train(model, train_ds, test_ds, epoch, args, train_summary_writer, val_summary_writer, hist, config_name, results_dir)
+    hist = train(model, train_ds, test_ds, epoch, args, train_summary_writer, val_summary_writer, hist, config_name, results_dir)
     
 save_hist(hist, config_name, results_dir)
