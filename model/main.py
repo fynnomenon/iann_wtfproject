@@ -31,9 +31,10 @@ parser.add_argument('--lr_sched', default=0, type=int)
 parser.add_argument('--optim', default="Adam", type=str)
 parser.add_argument('--step_size', default=5, type=int)
 
-parser.add_argument('--l1_norm', default=None, type=int)
-parser.add_argument('--l2_norm', default=None, type=int)
+parser.add_argument('--l1_norm', default=None, type=float)
+parser.add_argument('--l2_norm', default=None, type=float)
 
+parser.add_argument('--start_epoch',default=0,type=int)
 parser.add_argument('--no_epochs', default=24, type=int)
 parser.add_argument('--batch_size', default=32, type=int)
 
@@ -143,7 +144,8 @@ hist_val = validate(model, test_ds, -1, args, val_summary_writer, hist_val, val_
 save_hist(hist_val,val_config_name, results_dir)
 
 # Train/test the model        
-for epoch in range(0, args.no_epochs):        
+for epoch in range(args.start_epoch,args.no_epochs):   
+    print("Epoch: ",epoch)    
     train_summary_writer, val_summary_writer = create_summary_writers(args, config_name, results_dir)
     hist = train(model, train_ds, test_ds, epoch, args, train_summary_writer, val_summary_writer, hist, config_name, results_dir)
     
