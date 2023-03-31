@@ -41,7 +41,7 @@ def train(model, train_ds, val_ds, epoch, args, train_summary_writer, val_summar
             visualize_train = data
             idx += 1
         
-        metrics = model.train_step(data)
+        metrics = model.train_step(data,args.text_with_dense)
 
         with train_summary_writer.as_default(): 
                 for metric in model.metrics: 
@@ -65,7 +65,7 @@ def train(model, train_ds, val_ds, epoch, args, train_summary_writer, val_summar
             visualize_test = data
             idx += 1
 
-        metrics = model.test_step(data)
+        metrics = model.test_step(data,args.text_with_dense)
 
         with val_summary_writer.as_default():
             for metric in model.metrics:

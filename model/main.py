@@ -33,6 +33,8 @@ parser.add_argument('--step_size', default=5, type=int)
 parser.add_argument('--l1_norm', default=None, type=float)
 parser.add_argument('--l2_norm', default=None, type=float)
 
+parser.add_argument('--text_with_dense', default=1, type=int)
+
 parser.add_argument('--start_epoch',default=0,type=int)
 parser.add_argument('--no_epochs', default=14, type=int)
 parser.add_argument('--batch_size', default=32, type=int)
@@ -97,6 +99,8 @@ else:
     train_ds = tf.data.Dataset.load(dataset_path + '/train2014', compression='GZIP')
     test_ds = tf.data.Dataset.load(dataset_path + '/val2014', compression='GZIP')  
     
+train_ds = train_ds.take(20)
+test_ds = test_ds.take(10)
 #choose the optimizer you wanna test
 if args.optim=="Adam":
     optimizer = tf.keras.optimizers.Adam(learning_rate=args.lr)

@@ -148,7 +148,7 @@ class BaselineModel(tf.keras.Model):
             metric.reset_states()
 
 
-    def train_step(self,data):
+    def train_step(self,data,_):
         '''
         Perform a training step on the model.
 
@@ -180,7 +180,7 @@ class BaselineModel(tf.keras.Model):
 
         return {m.name : m.result() for m in self.metrics}
     
-    def test_step(self,data):
+    def test_step(self,data,_):
         '''
         Perform a testing step on the model.
 
@@ -297,7 +297,7 @@ class MultimodalModel(tf.keras.Model):
         self.dense_layer = tf.keras.layers.Dense(196, activation='relu')
         self.reshape_layer = tf.keras.layers.Reshape((14, 14, 1))
 
-    def call(self, input,dense=True,training=False):
+    def call(self, input,dense=1,training=False):
         '''
         Perform operations on an input image to generate a saliency map.
 
@@ -360,7 +360,7 @@ class MultimodalModel(tf.keras.Model):
         for metric in self.metrics:
             metric.reset_states()
 
-    def train_step(self,data):
+    def train_step(self,data,text_with_dense):
         '''
         Perform a training step on the model.
 
@@ -379,7 +379,7 @@ class MultimodalModel(tf.keras.Model):
         input,gt = data
 
         with tf.GradientTape() as tape: 
-            pred_map = self(input,training = True)
+            pred_map = self(input,text_with_dense,training = True)
             assert pred_map.shape == gt.shape
             loss = self.loss_function(pred_map, gt)
             
@@ -392,7 +392,7 @@ class MultimodalModel(tf.keras.Model):
 
         return {m.name : m.result() for m in self.metrics}
     
-    def test_step(self,data):
+    def test_step(self,data,text_with_dense):
         '''
         Perform a testing step on the model.
 
@@ -409,7 +409,7 @@ class MultimodalModel(tf.keras.Model):
         '''
         input,gt = data
         
-        pred_map = self(input,training = False)
+        pred_map = self(input,text_with_dense,training = False)
         assert pred_map.shape == gt.shape 
         loss = self.loss_function(pred_map, gt)
        

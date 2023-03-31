@@ -72,7 +72,7 @@ def generate_images(model, test_input, args, epoch, data, config_name, results_d
         None
     '''
     input, target = test_input
-    pred = model(input, training = False)
+    pred = model(input,args.text_with_dense,training = False)
     
     fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(8, 6))
     for row in range(3):

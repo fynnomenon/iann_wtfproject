@@ -34,7 +34,7 @@ def validate(model, val_ds, epoch, args, val_summary_writer, hist, config_name, 
             visualize_test = data
             idx += 1
 
-        metrics = model.test_step(data)
+        metrics = model.test_step(data,args.text_with_dense)
 
         with val_summary_writer.as_default():
             for metric in model.metrics:
