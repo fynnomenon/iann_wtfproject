@@ -47,47 +47,47 @@ data/
 │   │           ├── ...
 │   │           └── 2008_008755.npy
 │   ├── images/
-│	  │	  ├── 2008_000032.npy
-│	  │	  ├── ...
-│	  │	  └── 2008_008755.npy
+│   │   ├── 2008_000032.npy
+│   │   ├── ...
+│   │   └── 2008_008755.npy
 │   └── transcribed_text
-│       ├── 1/
-│		    |   ├── 2008_000032.json
-│	 	    |	  ├── ...
-│	 	    │	  └── 2008_008755.json
-│       ├── 2/
-│		    |   ├── 2008_000032.json
-│	 	    |	  ├── ...
-│	 	    │	  └── 2008_008755.json
-│       ├── 3/
-│		    |   ├── 2008_000032.json
-│	 	    |	  ├── ...
-│	 	    │	  └── 2008_008755.json
-│       ├── 4/
-│		    |   ├── 2008_000032.json
-│	 	    |	  ├── ...
-│	 	    │	  └── 2008_008755.json
+|       ├── 3/
+│       |   ├── 2008_000032.json
+│       |   ├── ...
+│       │   └── 2008_008755.json
+|       ├── 2/
+│       |   ├── 2008_000032.json
+│       |   ├── ...
+│       │   └── 2008_008755.json
+|       ├── 3/
+│       |   ├── 2008_000032.json
+│       |   ├── ...
+│       │   └── 2008_008755.json
+|       ├── 4/
+│       |   ├── 2008_000032.json
+│       |   ├── ...
+│       │   └── 2008_008755.json
 │       └── 5/
-│		        ├── 2008_000032.json
-│	 	    	  ├── ...
-│	 	        └── 2008_008755.json
+│           ├── 2008_000032.json
+│           ├── ...
+│           └── 2008_008755.json
 ├── SALICON/
 |   ├── annotations/
 |   |	  ├── train/
-|   |	  |	  ├── captions_train2014.json
-|   |	  |	  └── fixations_train2014.json
+|   |	  |   ├── captions_train2014.json
+|   |	  |   └── fixations_train2014.json
 |   |   └── val/
-|   |		    ├── captions_val2014.json
-|   |		    └── fixations_val2014.json
+|   |       ├── captions_val2014.json
+|   |       └── fixations_val2014.json
 |   └── images/
-|   	  ├── train/
-|   	  |	  ├── COCO_train2014_000000000009.jpg
-│	    	| 	├── ...
-|   	  |	   └── COCO_train2014_000000581797.jpg
+|       ├── train/
+|       |   ├── COCO_train2014_000000000009.jpg
+│       |   ├── ...
+|       |   └── COCO_train2014_000000581797.jpg
 |       └── val/
-|   		    ├── COCO_val2014_000000000133.jpg
-│	 		      ├── ...
-|   		    └── COCO_val2014_000000581899.jpg
+|           ├── COCO_val2014_000000000133.jpg
+│           ├── ...
+|           └── COCO_val2014_000000581899.jpg
 ├── dataloader_capgaze1.py
 ├── dataloader_salicon.py
 └── DatasetInspection.ipynb
