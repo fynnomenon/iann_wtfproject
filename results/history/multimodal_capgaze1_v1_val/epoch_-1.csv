@@ -1,0 +1,2 @@
+test_loss,test_AUC,test_CC,test_NSS,test_KLDiv,test_SIM
+0.50469744,0.8665343,0.692144,0.6572099,0.50469744,0.6148439
