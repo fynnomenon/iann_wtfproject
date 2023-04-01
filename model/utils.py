@@ -1,99 +1,129 @@
 import tensorflow as tf
-import cv2
 import os
-import numpy as np
-from os.path import join
 import matplotlib.pyplot as plt
-from PIL import Image
-from tqdm import tqdm
+import numpy as np
+import pandas as pd
 
-def blur(img):
+def create_summary_writers(args, config_name, results_dir):
     '''
-    image smoothing to reduce the noise: sharp edges in images are smoothed while minimizing too much blurring
+    Create tensorflow summary writers for the training and validation metrics.
+
+    Arguments: 
+        args:argparse.Namespace
+            Contains various training options.
+        config_name:str
+            Represents the name of the configuration.
+        results:dir:str
+            Represents the path to the directory where the results will be saved.
+    Returns:
+        train_summary_writer:SummaryWriter
+            Summary writer for training metrics.
+        val_summary_writer:SummaryWriter
+            Summary writer for validation metrics.
     '''
-    k_size = 11
-    bl = cv2.GaussianBlur(img,(k_size,k_size),0)
-    return tf.convert_to_tensor(bl)
+    train_log_path = f"{results_dir}/logs/train/{config_name}"
+    val_log_path = f"{results_dir}/logs/val/{config_name}"
 
-def plot(pred, gt, args, idx):
+    train_summary_writer = tf.summary.create_file_writer(train_log_path)
+    val_summary_writer = tf.summary.create_file_writer(val_log_path)
+
+    return train_summary_writer, val_summary_writer
+
+def _deprocess_img(processed_img):
     '''
-    plot the predicted map and the ground truth for comparison 
+    Takes a preprocessed image used by VGG-16 and returns the corresponding original image. This is done
+    by adding the mean pixel values, reversing the color channel back to RGB and clipping the values.
+    Arguments:
+    processed_img:tensor
+    Preprocessed image in shape(1,224,224)
+    Returns:
+    img:tensor
+    Original image in tf.uint8 format with shape(224,224,3).
     '''
-    #tf.transpose to convert the tensor into numpy array with dim (height, width, channels)
-    pred_npimg = np.transpose(pred.cpu().numpy(), (1, 2, 0))
-    gt_npimg = np.transpose(gt.cpu().numpy(), (1, 2, 0))
+    imagenet_means = [103.939, 116.779, 123.68]
+    means = tf.reshape(tf.constant(imagenet_means), [1, 1, 3])
+    img = processed_img + means
+    img = tf.reverse(img, axis=[-1])
+    img = tf.clip_by_value(img, 0, 255)
+    img = tf.cast(img, tf.uint8)
 
-    fig, ax = plt.subplots(1, 2, figsize=(10, 10))
-    ax[0].imshow(gt_npimg)
-    ax[0].set_title("Original")
+    return img
 
-    ax[1].imshow(pred_npimg)
-    ax[1].set_title("Predicted")
-
-    plt.savefig(join(args.results_dir, '{}_{}.png'.format(epoch, idx+1)))
-    plt.close()
-
-def visualize_model(model, loader, device, args):
+def generate_images(model, test_input, args, epoch, data, config_name, results_dir): 
     '''
-    visualize the preformance?? 
+    Generate and save images of the predicted saliency map for the input image and its ground truth.
+
+    Arguments:
+        model:tf.keras.Model
+            The model used for prediction.
+        test_input:tuple
+            Input for the prediction and its ground truth.
+        args:argpase.Namespace
+            Entails information, like the model name
+        epoch:int
+            Represents the current epoch of the training.
+        data:str
+            Represents the data type (train vs test).
+        config_name:str
+            Represents the name of the configuration being used for the model.
+        results_dir:str
+            Represents the dirextory to save the images.
+    Returns:
+        None
     '''
-    with tf.device(device):
-        model.eval()
-        os.makedirs(args.results_dir, exist_ok=True)
-        
-        for (img, img_id, sz) in tqdm(loader):
-            img = img.to(device)
-            
-            pred_map = model(img)
-            pred_map = pred_map.cpu().squeeze(0).numpy()
-            pred_map = cv2.resize(pred_map, (sz[0], sz[1]))
-            
-            pred_map = blur(pred_map)
-            img_save(pred_map, join(args.results_dir, img_id[0]), normalize=True)
-
-def img_save(tensor, fp, nrow=8, padding=2, normalize=False, range=None, scale_each=False, pad_value=0, format=None):
-    '''
-    save the images 
-    '''
-    grid = utils.make_grid(tensor, nrow=nrow, padding=padding, pad_value=pad_value, normalize=normalize, range=range, scale_each=scale_each)
-
-    ndarr = np.round(grid.numpy() * 255 + 0.5).clip(0, 255).astype(np.uint8)
-    ndarr = np.transpose(ndarr, (1, 2, 0))
-    im = Image.fromarray(ndarr)
-    exten = fp.split('.')[-1]
-    if exten == "png":
-        im.save(fp, format=format, compress_level=0)
-    else:
-        im.save(fp, format=format, quality=100) #for jpg
-
-class AverageMeter(object):
-    def __init__(self):
-        self.reset()
-
-    def reset(self):
-        self.val = 0
-        self.avg = 0
-        self.sum = 0
-        self.count = 0
-
-    def update(self, val, n=1):
-        self.val = val
-        self.sum += val * n
-        self.count += n
-        self.avg = self.sum / self.count
-
-
-def im2heat(pred_dir, a, gt, exten='.png'):
-    pred_nm = pred_dir + a + exten
-    #load the image in the program; returns ndarray
-    pred = cv2.imread(pred_nm, 0)
-    #get pseudocolored image
-    heatmap_img = cv2.applyColorMap(pred, cv2.COLORMAP_JET)
-    heatmap_img = convert(heatmap_img)
-    pred = np.stack((pred, pred, pred),2).astype('float32')
-    pred = pred / 255.0
+    input, target = test_input
+    pred = model(input,args.text_with_dense,training = False)
     
-    return np.uint8(pred * heatmap_img + (1.0-pred) * gt)
-
-def convert(image):
-    return tf.image.convert_image_dtype(image, dtype=tf.float32)
+    fig, axes = plt.subplots(nrows=3, ncols=4, figsize=(8, 6))
+    for row in range(3):
+        if args.model == 'multimodal':
+            imgs, caps = input
+            img = imgs[row]
+        else:
+            img = input[row]
+    
+        axes[row][0].imshow(pred[row], cmap='plasma')
+        axes[row][0].set_title(str(row+1) + ". Predicted")
+        
+        axes[row][1].imshow(_deprocess_img(img))
+        axes[row][1].imshow(pred[row], cmap='plasma', alpha=0.5, interpolation='bilinear')
+        
+        axes[row][2].imshow(target[row], cmap='plasma')
+        axes[row][2].set_title(str(row+1) + ". Original")
+        
+        axes[row][3].imshow(_deprocess_img(img))
+        axes[row][3].imshow(target[row], cmap='plasma', alpha=0.5, interpolation='bilinear')
+        
+        axes[row][0].axis('off')
+        axes[row][1].axis('off')
+        axes[row][2].axis('off')
+        axes[row][3].axis('off')
+    
+    image_dir = f'{results_dir}/images/{config_name}'
+    if not os.path.exists(image_dir):
+        os.makedirs(image_dir)
+        
+    fig.tight_layout()
+    plt.savefig(f"{image_dir}/epoch_{data}_{str(epoch)}")
+    plt.close()
+                                 
+def save_hist(hist, epoch, config_name, results_dir):
+    '''
+    Saves the training history to a csv file.
+    Arguments:
+        hist:dict
+            A dictionary containing the training history data.
+        epoch:int
+            Represents the current epoch of the training
+        config_name:str
+            The name of the configuration used to generate the training history data.
+        results_dir:str
+            The directory where the training history file should be saved.
+    Returns:
+        None
+    '''
+    hist_dir = f'{results_dir}/history/{config_name}'
+    if not os.path.exists(hist_dir):
+        os.makedirs(hist_dir)
+    
+    pd.DataFrame.from_dict(hist).to_csv(f'{hist_dir}/epoch_{epoch}.csv', index=False)
