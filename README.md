@@ -123,7 +123,7 @@ The full source code for our models can be found in the folder [model](model). T
 |   --step_size    |    5     |     int     |
 |    --l1_norm     |   None   |    float    |
 |    --l2_norm     |   None   |    float    |
-| --text_with_dense|     1    |     int     |
+| --text_with_dense|    1     |      0      |
 |  --start_epoch   |    0     |     int     |
 |   --no_epochs    |    24    |     int     |
 |   --batch_size   |    32    |     int     |
