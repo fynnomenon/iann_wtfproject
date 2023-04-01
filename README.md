@@ -1,11 +1,13 @@
 # Told you where to look - a multimodal approach for saliency prediction utilizing image captions
 
+Machine learning models for saliency estimations have various applications, such as human-robot interaction, virtual reality or image compression. In this two-week project, we investigating the impact of image captions on predicting saliency maps. We compared two encoder-decoder architectures: Our baseline model has to predict the saliency map from the images only, while the multimodal model gets additional image captions. We hoped to find out that adding the image captions improves the performance somewhat. However, the results do not support our hypothesis and show that both models perform similarly well.
+
 ## Documentation 🗎
 
 This repository contains:
 
 - a final paper and a short video about this project in the folder [report](report)
-- the training history, logs and predicted images as well as our saved models in the folder [results](results)
+- the training history, logs, predicted images (as well as a notebook analyzing the mentioned things) in the folder [results](results)
 
 ## Usage 🧠
 
@@ -123,7 +125,7 @@ The full source code for our models can be found in the folder [model](model). T
 |   --step_size    |    5     |     int     |
 |    --l1_norm     |   None   |    float    |
 |    --l2_norm     |   None   |    float    |
-| --text_with_dense|     1    |     int     |
+| --text_with_dense|    1     |      0      |
 |  --start_epoch   |    0     |     int     |
 |   --no_epochs    |    24    |     int     |
 |   --batch_size   |    32    |     int     |
@@ -140,8 +142,9 @@ python main.py --model baseline --data SALICON --config_name baseline_SALICON_v1
 --fine_tune 2 --start_epoch 0 --no_epochs 10 --save 1
 
 python main.py --model multimodal --data capgaze1 --config_name multimodal_SALICON_v1 
---fine_tune 2 --start_epoch 0 --no_epochs 10 --load 1
+--fine_tune 2 --start_epoch 0 --no_epochs 5 --load 1
 
 python main.py --model baseline --data capgaze1 --config_name multimodal_SALICON_v1 
---fine_tune 2 --start_epoch 0 --no_epochs 10 --load 1
+--fine_tune 2 --start_epoch 0 --no_epochs 5 --load 1
 ```
+The notebooks containg the runs can be found in the [results](results)
