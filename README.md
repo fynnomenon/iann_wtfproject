@@ -1,6 +1,6 @@
 # Told you where to look - a multimodal approach for saliency prediction utilizing image captions
 
-Machine learning models for saliency estimations have various applications, such as human-robot interaction, virtual reality or image compression. In this two-week project, we investigating the impact of image captions on predicting saliency maps. We compared two encoder-decoder architectures: Our baseline model has to predict the saliency map from the images only, while the multimodal model gets additional image captions. We hoped to find out that adding the image captions improves the performance somewhat. However, the results do not support our hypothesis and show that both models perform similarly well.
+Machine learning models for saliency estimations have various applications, such as human-robot interaction, virtual reality or image compression. In this two-week project, we investigatied the impact of image captions on predicting saliency maps. We compared two encoder-decoder architectures: Our baseline model has to predict the saliency map from the images only, while the multimodal model gets additional image captions. We hoped to find out that adding the image captions improves the performance somewhat. However, the results do not support our hypothesis and show that both models perform similarly well.
 
 ## Documentation 🗎
 
